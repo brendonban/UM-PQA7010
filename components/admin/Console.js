@@ -6,6 +6,24 @@ import { STATUSES, liveStore, demoStore } from "./store";
 import { firebaseReady } from "@/lib/firebase";
 
 const fmt = (d) => (d ? d.toLocaleString("en-MY", { day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit" }) : "—");
+// Plain-language explanations of Firebase sign-in errors, so staff know what to fix.
+function signInMsg(e) {
+  const code = (e && e.code) || "";
+  const host = typeof window !== "undefined" ? window.location.hostname : "this website";
+  const m = {
+    "auth/unauthorized-domain": `This website address (${host}) isn't allowed to sign in yet. In Firebase, go to Authentication → Settings → Authorized domains → Add domain, and add ${host}.`,
+    "auth/operation-not-allowed": "Google sign-in isn't switched on. In Firebase, go to Authentication → Sign-in method → Google → Enable → Save.",
+    "auth/configuration-not-found": "Firebase Authentication hasn't been set up. In Firebase, go to Authentication → Get started, then enable Google.",
+    "auth/popup-blocked": "Your browser blocked the sign-in window. Allow pop-ups for this site, then try again.",
+    "auth/popup-closed-by-user": "The sign-in window was closed before finishing. Please try again.",
+    "auth/cancelled-popup-request": "The sign-in window was closed before finishing. Please try again.",
+    "auth/invalid-api-key": "The Firebase apiKey in the site settings is wrong. Copy it again from Firebase → Project settings.",
+    "auth/api-key-not-valid.-please-pass-a-valid-api-key.": "The Firebase apiKey in the site settings is wrong. Copy it again from Firebase → Project settings.",
+    "auth/network-request-failed": "Couldn't reach Google. Check your internet connection and try again.",
+  };
+  return m[code] || `Sign-in failed${code ? ` (${code})` : ""}. Please try again, or send this message to the site admin.`;
+}
+
 const deniedMsg = (e) => (e && e.code === "permission-denied")
   ? "This account isn't on the staff list. Ask the console owner to add your email."
   : "Couldn't load data. Please try again.";
@@ -46,7 +64,7 @@ export default function Console() {
   async function signIn() {
     setError("");
     if (!firebaseReady) { setError("The database isn't connected yet."); return; }
-    try { await store.signIn(); } catch { setError("Sign-in was cancelled or failed."); }
+    try { await store.signIn(); } catch (e) { console.warn(e); setError(signInMsg(e)); }
   }
 
   if (!checked) return <div className="admin"><div className="wrap" /></div>;
@@ -60,7 +78,13 @@ export default function Console() {
           <p>Sign in with an approved UM Google account to see registrations and update trainee details and events.</p>
           <button className="cta-btn" type="button" onClick={signIn}>Sign in with Google</button>
           {error && <p className="ad-err">{error}</p>}
-          {!firebaseReady && <p className="ad-demo-note">The database isn&apos;t connected yet. <a className="link" href="/admin?demo=1">Preview the console with sample data</a></p>}
+          {!firebaseReady && (
+            <p className="ad-demo-note">
+              The database isn&apos;t connected yet: this version of the site was built without Firebase settings.
+              Paste them into <code>lib/firebase-config.js</code> (or add the Vercel environment variables) and redeploy.{" "}
+              <a className="link" href="/admin?demo=1">Preview the console with sample data</a>
+            </p>
+          )}
         </div>
       </div></div>
     );
