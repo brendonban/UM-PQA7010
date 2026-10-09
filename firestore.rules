@@ -1,0 +1,66 @@
+rules_version = '2';
+// Security rules for the Counseling@UM website.
+// Paste this whole file into Firebase console → Firestore Database → Rules → Publish.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Staff allowed to use the console: one document per email in the "admins" collection
+    // (document ID = the staff member's Google email, e.g. counseling.lab@um.edu.my).
+    function isAdmin() {
+      return request.auth != null
+        && request.auth.token.email_verified == true
+        && exists(/databases/$(database)/documents/admins/$(request.auth.token.email));
+    }
+
+    // A text field that is no longer than maxLen characters.
+    function textUpTo(v, maxLen) {
+      return v is string && v.size() <= maxLen;
+    }
+
+    // Checks a new registration sent from the public form.
+    // Field names are written as d['name'] because some (like 'service') are reserved words in rules.
+    function validRegistration(d) {
+      return d.keys().hasOnly(['name', 'phone', 'email', 'age', 'clientType', 'service', 'language', 'time',
+                               'preferredCounselor', 'concern', 'consent', 'status', 'assignedTo', 'notes', 'createdAt'])
+        && textUpTo(d['name'], 120) && d['name'].size() > 0
+        && textUpTo(d['phone'], 40) && d['phone'].size() > 0
+        && textUpTo(d['email'], 120)
+        && d['age'] is number && d['age'] > 0 && d['age'] < 120
+        && textUpTo(d['clientType'], 40)
+        && textUpTo(d['service'], 80)
+        && textUpTo(d['language'], 40)
+        && textUpTo(d['time'], 40)
+        && textUpTo(d['preferredCounselor'], 120)
+        && textUpTo(d['concern'], 1500)
+        && d['consent'] == true
+        && d['status'] == 'New'
+        && d['assignedTo'] == ''
+        && d['notes'] == ''
+        && d['createdAt'] == request.time;
+    }
+
+    // Trainee profiles: anyone can read (shown on the website); only staff can change.
+    match /trainees/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // Events: the public can read published events; staff can read and change all.
+    match /events/{id} {
+      allow read: if resource.data['published'] == true || isAdmin();
+      allow write: if isAdmin();
+    }
+
+    // Registrations: the public can only submit a new one; only staff can read or update.
+    match /registrations/{id} {
+      allow create: if validRegistration(request.resource.data);
+      allow read, update, delete: if isAdmin();
+    }
+
+    // The staff list itself: staff can see it; changes are made in the Firebase console.
+    match /admins/{email} {
+      allow read: if isAdmin();
+      allow write: if false;
+    }
+  }
+}
