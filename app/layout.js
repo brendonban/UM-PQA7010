@@ -4,6 +4,7 @@ import Header from "@/components/Header";
 import HelpButton from "@/components/HelpButton";
 import Icon from "@/components/Icon";
 import { SITE_NAME } from "@/lib/content";
+import { Analytics } from "@vercel/analytics/next";
 
 export const metadata = {
   title: { default: SITE_NAME, template: `%s · ${SITE_NAME}` },
@@ -34,6 +35,7 @@ export default function RootLayout({ children }) {
           </div>
         </footer>
         <HelpButton />
+        <Analytics />
       </body>
     </html>
   );
